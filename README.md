@@ -162,6 +162,8 @@ SPREADSHEET_ID = "your_google_sheet_id"
    - Add the service account email (found in the JSON key file)
    - Give "Editor" permissions
 
+[Google Sheet](https://docs.google.com/spreadsheets/d/16efc_Flx9j-0tpl0tj9UHexsodPod1CJcaIbNkR_Wk0/edit?usp=sharing)
+
 ### Step 6: Place Key File
 
 1. Rename the downloaded JSON file to `yourname-43df466db92f.json`
