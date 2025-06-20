@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+        }
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px solid #ffffff;
+            border-radius: 1rem;
+            pointer-events: none;
+        }
+        .scanning-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: rgba(0, 255, 0, 0.5);
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        /* ปรับขนาดกล้อง */
+        #video {
+            width: 100%; /* ความกว้างเต็มพื้นที่ของ container */
+            height: auto; /* ความสูงจะปรับตามอัตราส่วนภาพ */
+            max-width: 640px; /* จำกัดความกว้างสูงสุด */
+            max-height: 480px; /* จำกัดความสูงสูงสุด */
+            transform: scaleX(-1); /* Flip the video horizontally */
+        }
+
+        /* ปรับขนาด container */
+        .camera-container {
+            position: relative;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            width: 100%; /* ความกว้างเต็มพื้นที่ของ container */
+            max-width: 640px; /* จำกัดความกว้างสูงสุด */
+            margin: 0 auto; /* จัดกึ่งกลาง */
+        }
+
+        /* Popup Modal Styles */
+        .hidden {
+            display: none;
+        }
+        .fixed {
+            position: fixed;
+        }
+        .inset-0 {
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        .z-50 {
+            z-index: 50;
+        }
+        .bg-opacity-50 {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        /* Additional Styles for Settings Form */
+        #settingsForm {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen gradient-bg flex items-center justify-center p-4">
+    <div class="max-w-7xl w-full bg-white rounded-2xl shadow-xl p-6 space-y-6">
+
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Face Recognition System</h1>
+            <p class="text-gray-600">Real-time face detection and recognition</p>
+        </div>
+        
+
+        <!-- Popup Modal -->
+        <div id="errorModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+                <h2 class="text-xl font-bold text-red-500 mb-4">Server is not responding</h2>
+                <p class="mb-4">We are unable to connect to the server at this time.</p>
+                <div class="flex space-x-4 mb-4">
+                    <button id="retryButton" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        Retry
+                    </button>
+
+                    <button id="settingsButtonInModal" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                        Settings
+                    </button>
+                </div>
+
+                <!-- Settings Form (Hidden by Default) -->
+                <div id="settingsForm" class="hidden mt-4">
+                    <input type="text" id="serverUrlInput" class="border border-gray-300 rounded px-3 py-2 w-full mb-2" placeholder="Enter Server URL">
+                    <div class="flex space-x-4">
+                        <button id="saveSettingsButton" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                            Save
+                        </button>
+                        <button id="cancelSettingsButton" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Camera Section -->
+        <div class="camera-container bg-gray-900 mb-6">
+            <video id="video" class="w-full" autoplay playsinline></video>
+            <div class="camera-overlay">
+                <div class="scanning-line"></div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
+            <div class="flex space-x-4">
+                <button id="toggleCamera" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    <i class="fas fa-camera"></i> Toggle Camera
+                </button>
+                <select id="cameraSelect" class="border border-gray-300 rounded px-3 py-2">
+                    <option value="">Select Camera</option>
+                </select>
+            </div>
+            <div id="status" class="flex items-center space-x-2 text-gray-600">
+                <i class="fas fa-circle-notch fa-spin"></i>
+                <span>Initializing camera...</span>
+            </div>
+        </div>
+
+        <!-- Result Display -->
+        <div id="result" class="hidden w-full max-w-md mx-auto p-4 rounded-lg text-center transition-all duration-300">
+            <div class="flex items-center justify-center space-x-3">
+                <i class="fas fa-user-circle text-3xl"></i>
+                <span class="text-xl font-semibold"></span>
+            </div>
+        </div>
+
+        <!-- Manage User Button -->
+        <a href="manage_user.html" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 block w-full text-center">
+            <i class="fas fa-users"></i> Manage Users
+        </a>
+
+        <!-- Notification Logs -->
+        <div class="bg-gray-100 p-6 rounded-lg">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Notification Logs</h2>
+            <ul id="logList" class="list-disc pl-6 space-y-2 text-gray-700"></ul>
+        </div>
+    </div>
+
+    <script>
+        // Default Server URL
+        let serverUrl = localStorage.getItem('serverUrl') || 'http://127.0.0.1:5000';
+
+        // Function to update the server URL
+        function updateServerUrl(newUrl) {
+            serverUrl = newUrl;
+            localStorage.setItem('serverUrl', newUrl); // Save to Local Storage
+        }
+
+        // Function to check server status
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(serverUrl+'/status', { method: 'HEAD' }); // Use /status instead of /upload
+                if (!response.ok) throw new Error('Server unreachable');
+                return true;
+            } catch (error) {
+                console.error('Server error:', error);
+                return false;
+            }
+        }
+
+        // Show Error Modal
+        function showErrorModal() {
+            const modal = document.getElementById('errorModal');
+            modal.classList.remove('hidden');
+
+            // Retry Button
+            document.getElementById('retryButton').onclick = async () => {
+                modal.classList.add('hidden'); // Hide modal
+                const isConnected = await checkServerStatus();
+                if (!isConnected) showErrorModal(); // Show modal again if still unreachable
+            };
+
+            // Settings Button in Modal
+            document.getElementById('settingsButtonInModal').onclick = () => {
+                const settingsForm = document.getElementById('settingsForm');
+                const serverUrlInput = document.getElementById('serverUrlInput');
+                serverUrlInput.value = serverUrl; // Pre-fill input with current URL
+                settingsForm.classList.remove('hidden'); // Show settings form
+            };
+
+            // Save Settings Button
+            document.getElementById('saveSettingsButton').onclick = () => {
+                const serverUrlInput = document.getElementById('serverUrlInput');
+                const newUrl = serverUrlInput.value.trim();
+                if (newUrl) {
+                    updateServerUrl(newUrl); // Update and save the new URL
+                    alert('Server URL updated successfully!');
+                    document.getElementById('settingsForm').classList.add('hidden'); // Hide settings form
+                } else {
+                    alert('Please enter a valid server URL.');
+                }
+            };
+
+            // Cancel Settings Button
+            document.getElementById('cancelSettingsButton').onclick = () => {
+                document.getElementById('settingsForm').classList.add('hidden'); // Hide settings form
+            };
+        }
+
+        // Process Frame with Dynamic Server URL
+        async function processFrame() {
+            if (!isCameraOn || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').translate(canvas.width, 0);
+            canvas.getContext('2d').scale(-1, 1);
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            try {
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+                const formData = new FormData();
+                formData.append('file', blob, 'photo.jpg');
+                const response = await fetch(serverUrl+"/upload", { // Use dynamic serverUrl
+                    method: 'POST',
+                    body: formData
+                });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                showResult(data.name, data.name !== 'Unknown');
+                logNotification(data.name);
+            } catch (error) {
+                console.error('Error:', error);
+                status.innerHTML = `
+                    <i class="fas fa-exclamation-circle text-red-500"></i>
+                    <span>Error: ${error.message}</span>
+                `;
+                showErrorModal(); // Show modal on error
+            }
+        }
+
+        const video = document.getElementById('video');
+        const result = document.getElementById('result');
+        const status = document.getElementById('status');
+        const toggleCameraButton = document.getElementById('toggleCamera');
+        const newUserNameInput = document.getElementById('newUserName');
+        const newUserCodeInput = document.getElementById('newUserCode');
+        const addUserButton = document.getElementById('addUser');
+        const userList = document.getElementById('userList');
+        const logList = document.getElementById('logList');
+
+        let currentStream = null;
+        let cameras = [];
+        let isCameraOn = false;
+
+        // Fetch available cameras and select the first one automatically
+        async function fetchCameras() {
+            try {
+                // Fetch all devices
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                cameras = devices.filter(device => device.kind === 'videoinput');
+
+                if (cameras.length === 0) {
+                    throw new Error("No camera found");
+                }
+
+                // Select the first camera automatically
+                const firstCamera = cameras[0];
+                console.log(`Selected camera: ${firstCamera.label || 'Unnamed Camera'}`);
+            } catch (err) {
+                console.error('Error fetching cameras:', err);
+                status.innerHTML = `
+                    <i class="fas fa-exclamation-circle text-red-500"></i>
+                    <span>Camera error: ${err.message}</span>
+                `;
+            }
+        }
+
+        // Start/Stop Camera
+        async function toggleCamera() {
+            if (isCameraOn) {
+                // Stop the camera
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+                video.srcObject = null;
+                isCameraOn = false;
+                toggleCameraButton.textContent = 'Start Camera';
+                status.innerHTML = `
+                    <i class="fas fa-exclamation-circle text-red-500"></i>
+                    <span>Camera stopped</span>
+                `;
+            } else {
+                // Start the selected camera
+                if (cameras.length === 0) {
+                    alert("No camera available to start.");
+                    return;
+                }
+
+                const firstCamera = cameras[0];
+                const constraints = {
+                    video: { deviceId: firstCamera.deviceId ? { exact: firstCamera.deviceId } : undefined }
+                };
+
+                try {
+                    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    video.srcObject = currentStream;
+                    isCameraOn = true;
+                    toggleCameraButton.textContent = 'Stop Camera';
+                    status.innerHTML = `
+                        <i class="fas fa-check-circle text-green-500"></i>
+                        <span>Camera ready</span>
+                    `;
+                } catch (err) {
+                    console.error('Error accessing the camera:', err);
+                    status.innerHTML = `
+                        <i class="fas fa-exclamation-circle text-red-500"></i>
+                        <span>Camera error: ${err.message}</span>
+                    `;
+                }
+            }
+        }
+
+
+        // Show Result
+        function showResult(name, isRecognized) {
+            result.classList.remove('hidden', 'bg-green-100', 'bg-yellow-100');
+            result.classList.add(isRecognized ? 'bg-green-100' : 'bg-yellow-100');
+            const iconClass = isRecognized ? 'fa-user-check text-green-500' : 'fa-user-question text-yellow-500';
+            result.querySelector('i').className = `fas ${iconClass} text-3xl`;
+            result.querySelector('span').textContent = isRecognized ? `Welcome, ${name}!` : 'Unknown Person';
+            if (isRecognized) {
+                result.classList.add('pulse');
+            }
+        }
+        // Log Notification
+        function logNotification(name) {
+            const li = document.createElement('li');
+            li.textContent = `${new Date().toLocaleTimeString()} - Recognized: ${name}`;
+            logList.prepend(li);
+        }
+        
+        // Initialize the system
+        window.onload = async () => {
+            /* loadUsers(); */
+            const isConnected = await checkServerStatus();
+            if (!isConnected) showErrorModal();
+            fetchCameras(); // Fetch and select the first camera automatically
+            toggleCameraButton.addEventListener('click', toggleCamera);
+        };
+
+        setInterval(processFrame, 2000);
+    </script>
+</body>
+</html>

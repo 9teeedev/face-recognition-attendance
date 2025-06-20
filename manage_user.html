@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Users</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Modal Styles */
+        .hidden {
+            display: none;
+        }
+        .fixed {
+            position: fixed;
+        }
+        .inset-0 {
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+        .z-50 {
+            z-index: 50;
+        }
+        .bg-opacity-50 {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        /* Form Styles */
+        #editUserForm {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* Close Button */
+        #closeEditModalButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+        /* Image Preview */
+        #imagePreview {
+            width: 64px;
+            height: 64px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .hidden {
+            display: none;
+        }
+
+        /* Scrollable Table */
+        .max-h-96 {
+            max-height: 24rem; /* 96 = 24rem (Tailwind CSS) */
+        }
+        .overflow-y-auto {
+            overflow-y: auto;
+        }
+
+        /* Sticky Header */
+        thead.sticky {
+            position: sticky;
+            top: 0;
+            background-color: white; /* Ensure header stays visible */
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <!-- Back Button -->
+        <div class="mb-6">
+            <button id="backButton" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                <i class="fas fa-arrow-left"></i> Back
+            </button>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Manage Users</h1>
+        <div id="status" class="flex items-center space-x-2 text-gray-600">
+            <i class="fas fa-circle-notch fa-spin"></i>
+            <span>Connecting to server...</span>
+        </div>
+
+        <!-- Add User Form -->
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Add New User</h2>
+            <form id="addUserForm" class="space-y-4">
+                <!-- Name Field -->
+                <div>
+                    <label for="newUserName" class="block text-sm font-medium text-gray-700">Name</label>
+                    <input type="text" id="newUserName" placeholder="Enter name" class="mt-1 block w-full border border-gray-300 rounded px-3 py-2">
+                </div>
+
+                <!-- User Code Field -->
+                <div>
+                    <label for="newUserCode" class="block text-sm font-medium text-gray-700">User Code</label>
+                    <input type="text" id="newUserCode" placeholder="Enter user code" class="mt-1 block w-full border border-gray-300 rounded px-3 py-2">
+                </div>
+
+                <!-- Image Upload -->
+                <div>
+                    <label for="userImage" class="block text-sm font-medium text-gray-700">Upload Image (หน้าตรง เห็นใบหน้าชัดเจน ไม่ไกลเกินไป)</label>
+                    <div class="flex items-center space-x-4">
+                        <input type="file" id="userImage" accept="image/*" class="hidden">
+                        <button type="button" id="uploadImageButton" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                            <i class="fas fa-upload"></i> Upload
+                        </button>
+                        <img id="imagePreview" class="w-16 h-16 object-cover rounded-lg hidden" alt="Preview">
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="addUserSubmit" class="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    <i class="fas fa-plus"></i> Add User
+                </button>
+            </form>
+        </div>
+
+        <!-- Edit User Modal -->
+        <div id="editUserModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md relative">
+                <!-- Close Button -->
+                <button id="closeEditModalButton" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Edit User</h2>
+                <form id="editUserForm" class="space-y-4">
+                    <!-- Hidden Input for User ID -->
+                    <input type="hidden" id="editUserId">
+
+                    <!-- Name Field -->
+                    <div>
+                        <label for="editUserName" class="block text-sm font-medium text-gray-700">Name</label>
+                        <input type="text" id="editUserName" placeholder="Enter name" class="mt-1 block w-full border border-gray-300 rounded px-3 py-2">
+                    </div>
+
+                    <!-- User Code Field -->
+                    <div>
+                        <label for="editUserCode" class="block text-sm font-medium text-gray-700">User Code</label>
+                        <input type="text" id="editUserCode" placeholder="Enter user code" class="mt-1 block w-full border border-gray-300 rounded px-3 py-2">
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" id="editUserSubmit" class="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div id="deleteUserModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md relative">
+                <!-- Close Button -->
+                <button id="closeDeleteModalButton" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Confirm Deletion</h2>
+                <p class="text-gray-700 mb-4">Are you sure you want to delete this user?</p>
+
+                <!-- Hidden Input for User ID -->
+                <input type="hidden" id="deleteUserId">
+
+                <!-- Action Buttons -->
+                <div class="flex space-x-4">
+                    <button id="cancelDeleteButton" class="w-full bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                        Cancel
+                    </button>
+                    <button id="confirmDeleteButton" class="w-full bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Table -->
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">User List</h2>
+            <div class="max-h-96 overflow-y-auto">
+                <table id="userTable" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Code</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody" class="divide-y divide-gray-200">
+                        <!-- User rows will be dynamically inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    <script>
+        const status = document.getElementById('status');
+        let serverUrl = localStorage.getItem('serverUrl')
+        // Function to check server status
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(serverUrl+'/status', { method: 'HEAD' }); // Use /status instead of /upload
+                status.innerHTML = `
+                    <i class="fas fa-check-circle text-green-500"></i>
+                    <span>Connected</span>
+                `;
+                return true;
+            } catch (error) {
+                console.error('Server error:', error);
+                status.innerHTML = `
+                    <i class="fas fa-exclamation-circle text-red-500"></i>
+                    <span>Error: ${error.message}</span>
+                `;
+                return false;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // Back Button
+            const backButton = document.getElementById('backButton');
+            backButton.addEventListener('click', () => {
+                window.history.back(); // Go back to the previous page
+            });
+            
+            const addUserForm = document.getElementById('addUserForm');
+            const uploadImageButton = document.getElementById('uploadImageButton');
+            const userImageInput = document.getElementById('userImage');
+            const imagePreview = document.getElementById('imagePreview');
+            const userTableBody = document.getElementById('userTableBody');
+
+            const editUserModal = document.getElementById('editUserModal');
+            const closeEditModalButton = document.getElementById('closeEditModalButton');
+            const editUserForm = document.getElementById('editUserForm');
+            const editUserIdInput = document.getElementById('editUserId');
+            const editUserNameInput = document.getElementById('editUserName');
+            const editUserCodeInput = document.getElementById('editUserCode');
+
+            const deleteUserModal = document.getElementById('deleteUserModal');
+            const closeDeleteModalButton = document.getElementById('closeDeleteModalButton');
+            const cancelDeleteButton = document.getElementById('cancelDeleteButton');
+            const confirmDeleteButton = document.getElementById('confirmDeleteButton');
+            const deleteUserIdInput = document.getElementById('deleteUserId');
+
+            let userIdToDelete = null;
+
+            let selectedImage = null;
+
+            // Load Users
+            async function loadUsers() {
+                try {
+                    const response = await fetch(`${serverUrl}/get_users`, {
+                        headers: {
+                            "ngrok-skip-browser-warning": "true"
+                        }
+                    });
+                    const users = await response.json();
+                    userTableBody.innerHTML = '';
+                    users.forEach(user => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap">${user.id}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">${user.name}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">${user.user_code}</td>
+                            <td class="px-6 py-4 whitespace-nowrap space-x-2">
+                                <button class="editButton bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600" data-id="${user.id}" data-name="${user.name}" data-code="${user.user_code}">Edit</button>
+                                <button class="deleteButton bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600" data-id="${user.id}">Delete</button>
+                            </td>
+                        `;
+                        userTableBody.appendChild(row);
+                    });
+
+                    // Add Event Listeners for Edit/Delete
+                    document.querySelectorAll('.editButton').forEach(button => {
+                        button.addEventListener('click', () => openEditModal(button));
+                    });
+                    document.querySelectorAll('.deleteButton').forEach(button => {
+                        button.addEventListener('click', () => openDeleteModal(button.dataset.id));
+                    });
+                } catch (error) {
+                    console.error('Error loading users:', error);
+                }
+            }
+
+
+            // Add User Form Submission
+            addUserForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                
+                // Disable form while processing
+                const submitButton = addUserForm.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+                
+                try {
+                    const name = document.getElementById('newUserName').value.trim();
+                    const userCode = document.getElementById('newUserCode').value.trim();
+
+                    if (!name || !userCode || !selectedImage) {
+                        alert("กรุณากรอกข้อมูลให้ครบถ้วนและเลือกรูปภาพ");
+                        return;
+                    }
+
+                    const formData = new FormData();
+                    formData.append('name', name);
+                    formData.append('user_code', userCode);
+                    formData.append('file', selectedImage);
+
+                    const response = await fetch(`${serverUrl}/add_user`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                        alert("เพิ่มผู้ใช้สำเร็จ!");
+                        addUserForm.reset();
+                        selectedImage = null;
+                        imagePreview.src = '';
+                        imagePreview.classList.add('hidden');
+                        await loadUsers(); // Reload user list
+                    } else {
+                        throw new Error(result.message || "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ");
+                    }
+                } catch (error) {
+                    console.error('Error adding user:', error);
+                    alert(`เกิดข้อผิดพลาด: ${error.message}`);
+                } finally {
+                    submitButton.disabled = false;
+                }
+            });
+
+            // Image Upload Handling
+            uploadImageButton.addEventListener('click', () => {
+                userImageInput.click();
+            });
+
+            userImageInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    // Validate file type
+                    if (!file.type.startsWith('image/')) {
+                        alert("กรุณาเลือกไฟล์รูปภาพเท่านั้น");
+                        event.target.value = '';
+                        return;
+                    }
+                    
+                    // Validate file size (e.g., max 5MB)
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert("ขนาดไฟล์ต้องไม่เกิน 5MB");
+                        event.target.value = '';
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        imagePreview.src = e.target.result;
+                        imagePreview.classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                    selectedImage = file;
+                }
+            });
+
+            // Open Edit Modal
+            function openEditModal(button) {
+                const userId = button.dataset.id;
+                const userName = button.dataset.name;
+                const userCode = button.dataset.code;
+
+                // Populate form fields
+                editUserIdInput.value = userId;
+                editUserNameInput.value = userName;
+                editUserCodeInput.value = userCode;
+
+                // Show modal
+                editUserModal.classList.remove('hidden');
+            }
+
+            // Close Edit Modal
+            closeEditModalButton.addEventListener('click', () => {
+                editUserModal.classList.add('hidden');
+            });
+
+            // Handle Edit Form Submission
+            editUserForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+
+                // Disable form while processing
+                const submitButton = editUserForm.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+
+                try {
+                    const userId = editUserIdInput.value;
+                    const name = editUserNameInput.value.trim();
+                    const userCode = editUserCodeInput.value.trim();
+
+                    if (!name || !userCode) {
+                        alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+                        return;
+                    }
+
+                    const response = await fetch(`${serverUrl}/update_user/${userId}`, {
+                        method: 'PUT',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            name, 
+                            user_code: userCode 
+                        })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                        alert("อัพเดทข้อมูลสำเร็จ!");
+                        editUserModal.classList.add('hidden');
+                        await loadUsers(); // Reload user list
+                    } else {
+                        throw new Error(result.message || "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ");
+                    }
+                } catch (error) {
+                    console.error('Error updating user:', error);
+                    alert(`เกิดข้อผิดพลาด: ${error.message}`);
+                } finally {
+                    submitButton.disabled = false;
+                }
+            });
+
+            // Open Delete Modal
+            function openDeleteModal(userId) {
+                userIdToDelete = userId;
+                deleteUserIdInput.value = userId; // Store user ID in hidden input
+                deleteUserModal.classList.remove('hidden'); // Show modal
+            }
+
+            // Close Delete Modal
+            closeDeleteModalButton.addEventListener('click', () => {
+                deleteUserModal.classList.add('hidden');
+                userIdToDelete = null; // Reset user ID
+            });
+
+            cancelDeleteButton.addEventListener('click', () => {
+                deleteUserModal.classList.add('hidden');
+                userIdToDelete = null; // Reset user ID
+            });
+
+            // Confirm Delete
+            confirmDeleteButton.addEventListener('click', async () => {
+                if (!userIdToDelete) return;
+
+                try {
+                    const response = await fetch(serverUrl+`/delete_user/${userIdToDelete}`, { method: 'DELETE' });
+                    const result = await response.json();
+                    if (result.success) {
+                        alert("User deleted successfully!");
+                        deleteUserModal.classList.add('hidden'); // Close modal
+                        loadUsers(); // Reload user list
+                    } else {
+                        alert(result.message || "Failed to delete user.");
+                    }
+                } catch (error) {
+                    console.error('Error deleting user:', error);
+                    alert("An error occurred while deleting the user.");
+                }
+
+                userIdToDelete = null; // Reset user ID
+            });
+
+            // Initialize
+            loadUsers();
+        });
+        // Initialize the system
+        window.onload = async () => {
+            /* loadUsers(); */
+            await checkServerStatus();
+        };
+
+
+
+    </script>
+    
+    </body>
+</html>
